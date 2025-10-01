@@ -150,11 +150,10 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
         float xrespos = ((float)x - (float)cam.resolution.x * 0.5f );
         float yrespos = ((float)y - (float)cam.resolution.y * 0.5f);
         if (useAntiAliasing) {
-            thrust::default_random_engine xrng = makeSeededRandomEngine(iter, index, traceDepth);
-            thrust::default_random_engine yrng = makeSeededRandomEngine(iter + 1, index, traceDepth);
+            thrust::default_random_engine rng = makeSeededRandomEngine(iter, index, traceDepth);
             thrust::uniform_real_distribution<float> u01(0, 1);
-            xrespos += u01(xrng);
-            yrespos += u01(yrng);
+            xrespos += u01(rng);
+            yrespos += u01(rng);
         }
         segment.ray.direction = glm::normalize(cam.view
             - cam.right * cam.pixelLength.x * xrespos
