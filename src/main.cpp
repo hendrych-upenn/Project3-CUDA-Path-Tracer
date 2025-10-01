@@ -365,8 +365,8 @@ int main(int argc, char** argv)
 
     glm::vec3 view = cam.view;
     glm::vec3 up = cam.up;
-    glm::vec3 right = glm::cross(view, up);
-    up = glm::cross(right, view);
+    glm::vec3 right = cam.right;
+    //up = glm::cross(right, view);
 
     cameraPosition = cam.position;
 
