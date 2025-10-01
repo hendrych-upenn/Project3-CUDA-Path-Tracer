@@ -59,6 +59,9 @@ GuiDataContainer* imguiData = NULL;
 ImGuiIO* io = nullptr;
 bool mouseOverImGuiWinow = false;
 
+bool useAntiAliasing = true;
+bool prevUseAntiAliasing = useAntiAliasing;
+
 // Forward declarations for window loop and interactivity
 void runCuda();
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
@@ -273,8 +276,8 @@ void RenderImGui()
     ImGui::Begin("Path Tracer Analytics");                  // Create a window called "Hello, world!" and append into it.
     
     // LOOK: Un-Comment to check the output window and usage
-    //ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-    //ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+    ImGui::Text("Parameters");               // Display some text (you can use a format strings too)
+    ImGui::Checkbox("AntiAliasing", &useAntiAliasing);      // Edit bools storing our window open/close state
     //ImGui::Checkbox("Another Window", &show_another_window);
 
     //ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
@@ -420,7 +423,9 @@ void saveImage()
 
 void runCuda()
 {
-    if (camchanged)
+    bool useAntiAliasingChanged = prevUseAntiAliasing != useAntiAliasing;
+    prevUseAntiAliasing = useAntiAliasing;
+    if (camchanged || useAntiAliasingChanged)
     {
         iteration = 0;
         Camera& cam = renderState->camera;
@@ -458,7 +463,7 @@ void runCuda()
 
         // execute the kernel
         int frame = 0;
-        pathtrace(pbo_dptr, frame, iteration);
+        pathtrace(pbo_dptr, frame, iteration, useAntiAliasing);
 
         // unmap buffer object
         cudaGLUnmapBufferObject(pbo);
