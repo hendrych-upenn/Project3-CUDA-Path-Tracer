@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 
 #include "glm/glm.hpp"
-#define MAX_PATHTRACE_TEXTURES 16
+#define MAX_PATHTRACE_TEXTURES 8
 
 #include <string>
 #include <vector>
@@ -53,9 +53,21 @@ struct Geom
         FlatBufferView indicesBuffer;
         FlatBufferView positionsBuffer;
         FlatBufferView normalsBuffer;
-        //std::array<FlatBufferView, MAX_PATHTRACE_TEXTURES> textureCoordsBuffers;
-        //int numTexCoords = 0;
+        FlatBufferView textureCoordsBuffers[MAX_PATHTRACE_TEXTURES];
+        int numTexCoords = 0;
     } mesh;
+};
+
+struct TextureImageInfo {
+    bool exists = false;
+    int imageBufferIdx;
+    struct {
+        int minFilter;
+        int magFilter;
+        int wrapS;
+        int wrapT;
+    } sampler;
+    int texCoordsIdx = 0;
 };
 
 struct Material
@@ -70,20 +82,10 @@ struct Material
     float hasRefractive;
     float indexOfRefraction;
     glm::vec3 emittance;
-    /*struct {
-        struct {
-            bool exists = false;
-            int imageBufferIdx;
-            struct {
-                int minFilter;
-                int magFilter;
-                int wrapS;
-                int wrapT;
-            } sampler;
-            int texCoordsIdx = 0;
-        } baseColorTexture;
-    } gltf;*/
+    TextureImageInfo baseColorTexture;
 };
+
+
 
 struct Camera
 {
@@ -121,8 +123,31 @@ struct PathSegment
 // 2) BSDF evaluation: generate a new ray
 struct ShadeableIntersection
 {
+  int materialId;
   float t;
   glm::vec3 surfaceNormal;
+  glm::vec2 texCoords0;
+  glm::vec2 texCoords1;
+  glm::vec2 texCoords2;
+  glm::vec2 texCoords3;
+  glm::vec2 texCoords4;
+  glm::vec2 texCoords5;
+  glm::vec2 texCoords6;
+  glm::vec2 texCoords7;
+  glm::vec2 texCoords8;
+  glm::vec2 texCoords9;
+  glm::vec2 texCoords10;
+  glm::vec2 texCoords11;
+  glm::vec2 texCoords12;
+  glm::vec2 texCoords13;
+  glm::vec2 texCoords14;
+  glm::vec2 texCoords15;
+  //glm::vec2 texCoordsSI[MAX_PATHTRACE_TEXTURES];
   //std::array<glm::vec2, MAX_PATHTRACE_TEXTURES> texCoords;
-  int materialId;
 };
+
+
+// insane hack because using any type of array for texcoords in shadeableintersection caused launch failures on kernels
+__host__ __device__ glm::vec2& getTexCoords(ShadeableIntersection& si, int idx);
+
+__host__ __device__ const glm::vec2& getTexCoords(const ShadeableIntersection& si, int idx);

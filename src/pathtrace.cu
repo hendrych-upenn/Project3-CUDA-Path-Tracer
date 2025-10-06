@@ -127,14 +127,14 @@ void pathtraceInit(Scene* scene)
     cudaMalloc(&dev_bufferOffsets, scene->bufferOffsets.size() * sizeof(size_t));
     cudaMemcpy(dev_bufferOffsets, scene->bufferOffsets.data(), scene->bufferOffsets.size() * sizeof(size_t), cudaMemcpyHostToDevice);
 
-    /*cudaMalloc(&dev_imageBufferBytes, scene->imageBufferBytes.size() * sizeof(uint8_t));
+    cudaMalloc(&dev_imageBufferBytes, scene->imageBufferBytes.size() * sizeof(uint8_t));
     cudaMemcpy(dev_imageBufferBytes, scene->imageBufferBytes.data(), scene->imageBufferBytes.size() * sizeof(uint8_t), cudaMemcpyHostToDevice);
 
     cudaMalloc(&dev_imageBufferOffsets, scene->imageBufferOffsets.size() * sizeof(size_t));
     cudaMemcpy(dev_imageBufferOffsets, scene->imageBufferOffsets.data(), scene->imageBufferOffsets.size() * sizeof(size_t), cudaMemcpyHostToDevice);
 
     cudaMalloc(&dev_imagesData, scene->imagesData.size() * sizeof(ImageData));
-    cudaMemcpy(dev_imagesData, scene->imagesData.data(), scene->imagesData.size() * sizeof(ImageData), cudaMemcpyHostToDevice);*/
+    cudaMemcpy(dev_imagesData, scene->imagesData.data(), scene->imagesData.size() * sizeof(ImageData), cudaMemcpyHostToDevice);
 
     checkCUDAError("pathtraceInit");
 }
@@ -201,8 +201,8 @@ __global__ void generateRayFromCamera(Camera cam, int iter, int traceDepth, Path
 __global__ void computeIntersections(
     int depth,
     int num_paths,
-    PathSegment* pathSegments,
-    Geom* geoms,
+    const PathSegment* pathSegments,
+    const Geom* geoms,
     const uint8_t* bufferBytes,
     const size_t* bufferOffsets,
     int geoms_size,
@@ -217,7 +217,7 @@ __global__ void computeIntersections(
         float t = 0.0f;
         glm::vec3 intersect_point;
         glm::vec3 normal;
-        //std::array<glm::vec2, MAX_PATHTRACE_TEXTURES> texCoords;
+        glm::vec2 texCoords[MAX_PATHTRACE_TEXTURES];
 
         float t_min = FLT_MAX;
         int hit_geom_index = -1;
@@ -225,13 +225,13 @@ __global__ void computeIntersections(
 
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
-        //std::array<glm::vec2, MAX_PATHTRACE_TEXTURES> tmp_texCoords;
+        glm::vec2 tmp_texCoords[MAX_PATHTRACE_TEXTURES];
 
         // naive parse through global geoms
 
         for (int i = 0; i < geoms_size; i++)
         {
-            Geom& geom = geoms[i];
+            const Geom& geom = geoms[i];
 
             if (geom.type == CUBE)
             {
@@ -244,7 +244,7 @@ __global__ void computeIntersections(
             else if (geom.type == MESH)
             {
                 t = meshIntersectionTest(geom, pathSegment.ray, bufferBytes, bufferOffsets, tmp_intersect, tmp_normal 
-                    //,tmp_texCoords
+                    ,tmp_texCoords
                 );
             }
             // TODO: add more intersection tests here... triangle? metaball? CSG?
@@ -257,7 +257,10 @@ __global__ void computeIntersections(
                 hit_geom_index = i;
                 intersect_point = tmp_intersect;
                 normal = tmp_normal;
-                //texCoords = tmp_texCoords;
+#pragma unroll
+                for (int j = 0; j < MAX_PATHTRACE_TEXTURES; j++) {
+                    texCoords[j] = tmp_texCoords[j];
+                }
             }
         }
 
@@ -274,7 +277,10 @@ __global__ void computeIntersections(
             intersections[path_index].t = t_min;
             intersections[path_index].materialId = geoms[hit_geom_index].materialid;
             intersections[path_index].surfaceNormal = normal;
-            //intersections[path_index].texCoords = texCoords;
+#pragma unroll
+            for (int j = 0; j < MAX_PATHTRACE_TEXTURES; j++) {
+                getTexCoords(intersections[path_index], j) = texCoords[j];
+            }
         }
     }
 }
@@ -294,9 +300,9 @@ __global__ void shadeMaterial(
     int depth,
     const ShadeableIntersection* shadeableIntersections,
     PathSegment* pathSegments,
-    /*uint8_t* imageBufferBytes,
+    uint8_t* imageBufferBytes,
     size_t* imageBufferOffsets,
-    ImageData* imagesData,*/
+    ImageData* imagesData,
     const Material* materials)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -315,19 +321,24 @@ __global__ void shadeMaterial(
             Material material = materials[intersection.materialId];
             glm::vec3 materialColor = material.color;
 
-            //if (material.gltf.baseColorTexture.exists) {
-            //    auto& baseColorTexture = material.gltf.baseColorTexture;
-            //    glm::vec2 texCoords = intersection.texCoords[baseColorTexture.texCoordsIdx];
-            //    ImageData imageData = imagesData[baseColorTexture.imageBufferIdx];
-            //    // TODO: update for different sampling modes and wrapping
-            //    texCoords = glm::fract(texCoords);
-            //    int s = glm::floor(texCoords.s * imageData.width);
-            //    int t = glm::floor(texCoords.t * imageData.height);
+            if (material.baseColorTexture.exists) {
+                auto& baseColorTexture = material.baseColorTexture;
+                glm::vec2 texCoords = getTexCoords(intersection, baseColorTexture.texCoordsIdx);
+                ImageData imageData = imagesData[baseColorTexture.imageBufferIdx];
+                // TODO: update for different sampling modes and wrapping
+                texCoords = glm::fract(texCoords);
+                int s = glm::floor(texCoords.s * imageData.width);
+                int t = glm::floor(texCoords.t * imageData.height);
 
-            //    size_t imageBufferOffset = imageBufferOffsets[baseColorTexture.imageBufferIdx];
-            //    imageBufferOffset += s + ((size_t)t) * imageData.width;
+                size_t imageBufferOffset = imageBufferOffsets[baseColorTexture.imageBufferIdx];
+                imageBufferOffset += (s + ((size_t)t) * imageData.width) * ((((size_t)imageData.bitDepthPerChannel) * imageData.component) / 8);
 
-            //}
+                uint8_t* pixelData = imageBufferBytes + imageBufferOffset;
+
+                glm::vec3 texColor = glm::vec3(pixelData[0], pixelData[1], pixelData[2]) / 255.0f;
+
+                materialColor *= texColor;
+            }
 
             pathSegment.color *= materialColor;
 
@@ -480,6 +491,7 @@ void pathtrace(uchar4* pbo, int frame, int iter, bool useAntiAliasing)
         //std::cout << "depth: " << depth << std::endl;
         // clean shading chunks
         cudaMemset(dev_intersections, 0, pixelcount * sizeof(ShadeableIntersection));
+        checkCUDAError("cudaMemset bounce");
 
         // tracing
         dim3 numblocksPathSegmentTracing = (num_paths + blockSize1d - 1) / blockSize1d;
@@ -515,9 +527,9 @@ void pathtrace(uchar4* pbo, int frame, int iter, bool useAntiAliasing)
             depth,
             dev_intersections,
             dev_paths,
-            /*dev_imageBufferBytes,
+            dev_imageBufferBytes,
             dev_imageBufferOffsets,
-            dev_imagesData,*/
+            dev_imagesData,
             dev_materials
         );
         checkCUDAError("shadeMaterial");

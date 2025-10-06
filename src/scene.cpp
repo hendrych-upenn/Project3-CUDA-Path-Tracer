@@ -110,9 +110,11 @@ bool geomFromPrimitive(Geom& geom, const tinygltf::Model& model, const tinygltf:
     }
     geom.mesh.normalsBuffer = flatBufferViewFromAccessor(model, normalAccessor);
 
-    /*geom.mesh.numTexCoords = 0;
-    for (int i = 0; attributes.find("TEXCOORD_" + i) != attributes.end(); i++) {
-        int texcoordAccessorIdx = (*attributes.find("TEXCOORD_" + i)).second;
+    geom.mesh.numTexCoords = 0;
+    //int i = 0;
+    //std::string texCoordStr =  + std::(i;
+    for (int i = 0; attributes.find(std::string("TEXCOORD_") + std::to_string(i)) != attributes.end() && i < MAX_PATHTRACE_TEXTURES; i++) {
+        int texcoordAccessorIdx = (*attributes.find(std::string("TEXCOORD_") + std::to_string(i))).second;
         tinygltf::Accessor texcoordAccessor = model.accessors[texcoordAccessorIdx];
         if (texcoordAccessor.type != TINYGLTF_TYPE_VEC2) {
             cout << "Mesh TEXCOORD_" << i << " accessor type not vec2, skipping..." << endl;
@@ -124,7 +126,7 @@ bool geomFromPrimitive(Geom& geom, const tinygltf::Model& model, const tinygltf:
         }
         geom.mesh.textureCoordsBuffers[i] = flatBufferViewFromAccessor(model, texcoordAccessor);
         geom.mesh.numTexCoords++;
-    }*/
+    }
 
 
     return true;
@@ -186,23 +188,23 @@ void loadMaterials(std::vector<Material>& materials, const tinygltf::Model& mode
         mat.color = glm::vec3(glm::make_vec3(material.pbrMetallicRoughness.baseColorFactor.data()));
         mat.emittance = glm::vec3(glm::make_vec3(material.emissiveFactor.data()));
         
-        /*if (material.pbrMetallicRoughness.baseColorTexture.index != -1) {
+        if (material.pbrMetallicRoughness.baseColorTexture.index != -1) {
             const auto& colorTexture = material.pbrMetallicRoughness.baseColorTexture;
-            mat.gltf.baseColorTexture.exists = true;
-            mat.gltf.baseColorTexture.texCoordsIdx = colorTexture.texCoord;
+            mat.baseColorTexture.exists = true;
+            mat.baseColorTexture.texCoordsIdx = colorTexture.texCoord;
 
             int textureIndex = colorTexture.index;
             const tinygltf::Texture& texture = model.textures[textureIndex];
-            mat.gltf.baseColorTexture.imageBufferIdx = texture.source;
+            mat.baseColorTexture.imageBufferIdx = texture.source;
 
             const tinygltf::Sampler sampler = model.samplers[texture.sampler];
-            auto& matSampler = mat.gltf.baseColorTexture.sampler;
+            auto& matSampler = mat.baseColorTexture.sampler;
 
             matSampler.magFilter = sampler.magFilter;
             matSampler.minFilter = sampler.minFilter;
             matSampler.wrapS = sampler.wrapS;
             matSampler.wrapT = sampler.wrapT;
-        }*/
+        }
         
         materials.emplace_back(mat);
     }
@@ -305,7 +307,7 @@ void Scene::loadFromGLTF(const std::string& gltfName) {
 
     getBufferBytes(this->bufferBytes, this->bufferOffsets, model);
 
-    //getImageBuffers(this->imageBufferBytes, this->imageBufferOffsets, this->imagesData, model);
+    getImageBuffers(this->imageBufferBytes, this->imageBufferOffsets, this->imagesData, model);
 
     this->geoms = std::move(geoms);
     this->materials = std::move(materials);

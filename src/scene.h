@@ -19,7 +19,7 @@ public:
     std::optional<tinygltf::Model> model;
     std::vector<uint8_t> bufferBytes;
     std::vector<size_t> bufferOffsets;
-    /*std::vector<uint8_t> imageBufferBytes;
+    std::vector<uint8_t> imageBufferBytes;
     std::vector<size_t> imageBufferOffsets;
-    std::vector<ImageData> imagesData;*/
+    std::vector<ImageData> imagesData;
 };

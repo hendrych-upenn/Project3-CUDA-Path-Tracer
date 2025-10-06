@@ -169,8 +169,9 @@ __host__ __device__ float meshIntersectionTest(
     const uint8_t* bufferBytes,
     const size_t* bufferOffsets,
     glm::vec3& intersectionPoint,
-    glm::vec3& normal
-    //,std::array<glm::vec2, MAX_PATHTRACE_TEXTURES>& texCoords
+    glm::vec3& normal,
+    //std::array<glm::vec2, MAX_PATHTRACE_TEXTURES>& texCoords
+    glm::vec2 (&texCoords)[MAX_PATHTRACE_TEXTURES]
 ) {
     glm::vec3 ro = multiplyMV(mesh.inverseTransform, glm::vec4(r.origin, 1.0f));
     glm::vec3 rd = glm::normalize(multiplyMV(mesh.inverseTransform, glm::vec4(r.direction, 0.0f)));
@@ -214,13 +215,13 @@ __host__ __device__ float meshIntersectionTest(
                 objspaceNormal *= -1;
             }
 
-            /*for (int j = 0; j < mesh.mesh.numTexCoords; j++) {
+            for (int j = 0; j < mesh.mesh.numTexCoords; j++) {
                 glm::vec2 t0 = getData<glm::vec2>(i0, mesh.mesh.textureCoordsBuffers[j], bufferBytes, bufferOffsets);
                 glm::vec2 t1 = getData<glm::vec2>(i1, mesh.mesh.textureCoordsBuffers[j], bufferBytes, bufferOffsets);
                 glm::vec2 t2 = getData<glm::vec2>(i2, mesh.mesh.textureCoordsBuffers[j], bufferBytes, bufferOffsets);
 
                 texCoords[j] = interpolateBarycentric(baryPosition, t0, t1, t2);
-            }*/
+            }
 
             min_t = t;
             intersectionPoint = tmp_intersectionPoint;
@@ -228,4 +229,85 @@ __host__ __device__ float meshIntersectionTest(
         }
     }
     return min_t;
+}
+
+
+
+// insane hack because using any type of array for texcoords in shadeableintersection caused launch failures on kernels
+__host__ __device__ glm::vec2& getTexCoords(ShadeableIntersection& si, int idx) {
+    switch (idx) {
+    case 0:
+        return si.texCoords0;
+    case 1:
+        return si.texCoords1;
+    case 2:
+        return si.texCoords2;
+    case 3:
+        return si.texCoords3;
+    case 4:
+        return si.texCoords4;
+    case 5:
+        return si.texCoords5;
+    case 6:
+        return si.texCoords6;
+    case 7:
+        return si.texCoords7;
+    case 8:
+        return si.texCoords8;
+    case 9:
+        return si.texCoords9;
+    case 10:
+        return si.texCoords10;
+    case 11:
+        return si.texCoords11;
+    case 12:
+        return si.texCoords12;
+    case 13:
+        return si.texCoords13;
+    case 14:
+        return si.texCoords14;
+    case 15:
+        return si.texCoords15;
+    default:
+        return si.texCoords0;
+    }
+}
+
+__host__ __device__ const glm::vec2& getTexCoords(const ShadeableIntersection& si, int idx) {
+    switch (idx) {
+    case 0:
+        return si.texCoords0;
+    case 1:
+        return si.texCoords1;
+    case 2:
+        return si.texCoords2;
+    case 3:
+        return si.texCoords3;
+    case 4:
+        return si.texCoords4;
+    case 5:
+        return si.texCoords5;
+    case 6:
+        return si.texCoords6;
+    case 7:
+        return si.texCoords7;
+    case 8:
+        return si.texCoords8;
+    case 9:
+        return si.texCoords9;
+    case 10:
+        return si.texCoords10;
+    case 11:
+        return si.texCoords11;
+    case 12:
+        return si.texCoords12;
+    case 13:
+        return si.texCoords13;
+    case 14:
+        return si.texCoords14;
+    case 15:
+        return si.texCoords15;
+    default:
+        return si.texCoords0;
+    }
 }

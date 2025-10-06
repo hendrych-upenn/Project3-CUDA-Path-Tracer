@@ -79,6 +79,7 @@ __host__ __device__ float meshIntersectionTest(
     const uint8_t* bufferBytes,
     const size_t* bufferOffsets,
     glm::vec3& intersectionPoint,
-    glm::vec3& normal
-    //,std::array<glm::vec2, MAX_PATHTRACE_TEXTURES>& texCoords
+    glm::vec3& normal,
+    //std::array<glm::vec2, MAX_PATHTRACE_TEXTURES>& texCoords
+    glm::vec2(&texCoords)[MAX_PATHTRACE_TEXTURES]
 );
