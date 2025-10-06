@@ -3,16 +3,19 @@
 #include <cuda_runtime.h>
 
 #include "glm/glm.hpp"
+#define MAX_PATHTRACE_TEXTURES 16
 
 #include <string>
 #include <vector>
+#include <array>
 
 #define BACKGROUND_COLOR (glm::vec3(0.0f))
 
 enum GeomType
 {
     SPHERE,
-    CUBE
+    CUBE,
+    MESH,
 };
 
 struct Ray
@@ -21,16 +24,38 @@ struct Ray
     glm::vec3 direction;
 };
 
+struct FlatBufferView {
+    int buffer;
+    size_t byteOffset;
+    size_t byteLength;
+    size_t byteStride;
+};
+
+struct ImageData {
+    int width;
+    int height;
+    int component;
+    int bitDepthPerChannel;
+    int pixelType;
+};
+
 struct Geom
 {
     enum GeomType type;
     int materialid;
-    glm::vec3 translation;
-    glm::vec3 rotation;
-    glm::vec3 scale;
     glm::mat4 transform;
     glm::mat4 inverseTransform;
     glm::mat4 invTranspose;
+    struct {
+        int mode;
+        glm::vec3 position_min;
+        glm::vec3 position_max;
+        FlatBufferView indicesBuffer;
+        FlatBufferView positionsBuffer;
+        FlatBufferView normalsBuffer;
+        //std::array<FlatBufferView, MAX_PATHTRACE_TEXTURES> textureCoordsBuffers;
+        //int numTexCoords = 0;
+    } mesh;
 };
 
 struct Material
@@ -44,7 +69,20 @@ struct Material
     float hasReflective;
     float hasRefractive;
     float indexOfRefraction;
-    float emittance;
+    glm::vec3 emittance;
+    /*struct {
+        struct {
+            bool exists = false;
+            int imageBufferIdx;
+            struct {
+                int minFilter;
+                int magFilter;
+                int wrapS;
+                int wrapT;
+            } sampler;
+            int texCoordsIdx = 0;
+        } baseColorTexture;
+    } gltf;*/
 };
 
 struct Camera
@@ -61,7 +99,8 @@ struct Camera
 
 struct RenderState
 {
-    Camera camera;
+    std::vector<Camera> cameras;
+    int activeCamera = 0;
     unsigned int iterations;
     int traceDepth;
     std::vector<glm::vec3> image;
@@ -84,5 +123,6 @@ struct ShadeableIntersection
 {
   float t;
   glm::vec3 surfaceNormal;
+  //std::array<glm::vec2, MAX_PATHTRACE_TEXTURES> texCoords;
   int materialId;
 };

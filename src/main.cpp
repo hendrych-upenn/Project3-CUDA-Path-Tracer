@@ -1,3 +1,5 @@
+
+
 #include "glslUtility.hpp"
 #include "image.h"
 #include "pathtrace.h"
@@ -13,6 +15,10 @@
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_glfw.h"
 #include "ImGui/imgui_impl_opengl3.h"
+
+#define TINYGLTF_IMPLEMENTATION
+
+#include "tiny_gltf.h"
 
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
@@ -282,6 +288,8 @@ void RenderImGui()
 
     //ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
     //ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+    ImGui::SliderInt("Depth", &renderState->traceDepth, 1, 10);
+    ImGui::SliderInt("Iterations", reinterpret_cast<int*>(&renderState->iterations), 1, 10000);
 
     //if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
     //    counter++;
@@ -362,7 +370,7 @@ int main(int argc, char** argv)
     // Set up camera stuff from loaded path tracer settings
     iteration = 0;
     renderState = &scene->state;
-    Camera& cam = renderState->camera;
+    Camera& cam = renderState->cameras[renderState->activeCamera];
     width = cam.resolution.x;
     height = cam.resolution.y;
 
@@ -428,7 +436,7 @@ void runCuda()
     if (camchanged || useAntiAliasingChanged)
     {
         iteration = 0;
-        Camera& cam = renderState->camera;
+        Camera& cam = renderState->cameras[renderState->activeCamera];
         cameraPosition.x = zoom * sin(phi) * sin(theta);
         cameraPosition.y = zoom * cos(theta);
         cameraPosition.z = zoom * cos(phi) * sin(theta);
@@ -497,7 +505,7 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
             case GLFW_KEY_SPACE:
                 camchanged = true;
                 renderState = &scene->state;
-                Camera& cam = renderState->camera;
+                Camera& cam = renderState->cameras[renderState->activeCamera];
                 cam.lookAt = ogLookAt;
                 break;
         }
@@ -540,7 +548,7 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos)
     else if (middleMousePressed)
     {
         renderState = &scene->state;
-        Camera& cam = renderState->camera;
+        Camera& cam = renderState->cameras[renderState->activeCamera];
         glm::vec3 forward = cam.view;
         forward.y = 0.0f;
         forward = glm::normalize(forward);

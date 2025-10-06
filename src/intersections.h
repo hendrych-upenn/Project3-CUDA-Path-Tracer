@@ -71,3 +71,14 @@ __host__ __device__ float sphereIntersectionTest(
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
     bool& outside);
+
+
+__host__ __device__ float meshIntersectionTest(
+    const Geom mesh,
+    const Ray r,
+    const uint8_t* bufferBytes,
+    const size_t* bufferOffsets,
+    glm::vec3& intersectionPoint,
+    glm::vec3& normal
+    //,std::array<glm::vec2, MAX_PATHTRACE_TEXTURES>& texCoords
+);
