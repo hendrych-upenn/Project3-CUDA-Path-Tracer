@@ -1,0 +1,11 @@
+Model Information:
+* title:	Light fixture
+* source:	https://sketchfab.com/3d-models/light-fixture-bae2e5cae1a24655a9223c1a82d7921f
+* author:	Aullwen (https://sketchfab.com/Aullwen)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Light fixture" (https://sketchfab.com/3d-models/light-fixture-bae2e5cae1a24655a9223c1a82d7921f) by Aullwen (https://sketchfab.com/Aullwen) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
