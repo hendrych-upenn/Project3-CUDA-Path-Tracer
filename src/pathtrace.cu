@@ -14,12 +14,15 @@
 #include "scene.h"
 #include "glm/glm.hpp"
 #include "glm/gtx/norm.hpp"
+#include <glm/gtc/noise.hpp>
 #include "utilities.h"
 #include "intersections.h"
 #include "interactions.h"
 #include <iostream>
 
 #define CONTIGUOUS_MATERIALS 1
+#define PROCEDURAL_COLOR_TEXTURES 0
+#define PROCEDURAL_NORMAL_TEXTURES 1
 
 #define ERRORCHECK 1
 
@@ -311,6 +314,11 @@ __host__ __device__ glm::vec4 indexIntoImage(
 
 }
 
+__host__ __device__ glm::vec3 proceduralPerlinTexture(glm::vec2 texCoords, float frequency) {
+    texCoords *= frequency;
+    return glm::vec3(glm::perlin(glm::vec3(texCoords * frequency, 0.0f)), glm::perlin(glm::vec3(texCoords, 10.0f)), glm::perlin(glm::vec3(texCoords, 20.0f)));
+}
+
 // LOOK: "fake" shader demonstrating what you might do with the info in
 // a ShadeableIntersection, as well as how to use thrust's random number
 // generator. Observe that since the thrust random number generator basically
@@ -351,8 +359,11 @@ __global__ void shadeMaterial(
             if (material.baseColorTexture.exists) {
                 auto& baseColorTexture = material.baseColorTexture;
                 glm::vec2 texCoords = getTexCoords(intersection, baseColorTexture.texCoordsIdx);
-
+#if PROCEDURAL_COLOR_TEXTURES
+                glm::vec3 texColor = (proceduralPerlinTexture(texCoords, PROCEDURAL_COLOR_TEXTURES) + 2.0f) / 3.0f; // map to [0.3, 1]
+#else
                 glm::vec3 texColor = glm::vec3(indexIntoImage(imageBufferBytes, imageBufferOffsets, imagesData, baseColorTexture.imageBufferIdx, texCoords)) / 255.0f;
+#endif
 
                 materialColor *= texColor;
             }
@@ -363,9 +374,14 @@ __global__ void shadeMaterial(
 
                 glm::vec2 texCoords = getTexCoords(intersection, normalTexture.imageBufferIdx);
 
+#if PROCEDURAL_NORMAL_TEXTURES
+                glm::vec3 texColor = proceduralPerlinTexture(texCoords, PROCEDURAL_NORMAL_TEXTURES);
+                texColor.z = (texColor.z + 1.0f) / 2.0f; // map to (0, 1]
+#else
                 glm::vec3 texColor = glm::vec3(indexIntoImage(imageBufferBytes, imageBufferOffsets, imagesData, normalTexture.imageBufferIdx, texCoords)) / 255.0f;
-
                 texColor = texColor * 2.0f - 1.0f; // map to [-1, 1]
+#endif
+
 
                 glm::vec3 surfaceNormal = glm::normalize(intersection.surfaceNormal);
                 glm::vec3 surfaceTangent = glm::vec3(intersection.surfaceTangent);
