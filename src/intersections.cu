@@ -1,6 +1,6 @@
 #include "intersections.h"
 
-#define ARBITRARY_MESH_BOUNDING_VOLUME_CULLING 0
+#define ARBITRARY_MESH_BOUNDING_VOLUME_CULLING 1
 
 __host__ __device__ float boxIntersectionTest(
     Geom box,
@@ -170,6 +170,7 @@ __host__ __device__ float meshIntersectionTest(
     const size_t* bufferOffsets,
     glm::vec3& intersectionPoint,
     glm::vec3& normal,
+    glm::vec4& tangent,
     //std::array<glm::vec2, MAX_PATHTRACE_TEXTURES>& texCoords
     glm::vec2 (&texCoords)[MAX_PATHTRACE_TEXTURES]
 ) {
@@ -184,11 +185,28 @@ __host__ __device__ float meshIntersectionTest(
 
     float min_t = -1;
 
-    size_t count = mesh.mesh.indicesBuffer.byteLength / sizeof(unsigned int);
-    for (int i = 0; i < count; i += 3) {
-        unsigned int i0 = getData<unsigned int>(i, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
-        unsigned int i1 = getData<unsigned int>(i+1, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
-        unsigned int i2 = getData<unsigned int>(i+2, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+    for (int i = 0; i < mesh.mesh.count; i += 3) {
+        unsigned int i0, i1, i2;
+        switch (mesh.mesh.indicesType) {
+        case U8:
+            i0 = getData<uint8_t>(i, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            i1 = getData<uint8_t>(i + 1, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            i2 = getData<uint8_t>(i + 2, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            break;
+        case U16:
+            i0 = getData<uint16_t>(i, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            i1 = getData<uint16_t>(i + 1, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            i2 = getData<uint16_t>(i + 2, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            break;
+        case U32:
+            i0 = getData<uint32_t>(i, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            i1 = getData<uint32_t>(i + 1, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            i2 = getData<uint32_t>(i + 2, mesh.mesh.indicesBuffer, bufferBytes, bufferOffsets);
+            break;
+        default:
+            break;
+
+        }
         glm::vec3 v0 = getData<glm::vec3>(i0, mesh.mesh.positionsBuffer, bufferBytes, bufferOffsets);
         glm::vec3 v1 = getData<glm::vec3>(i1, mesh.mesh.positionsBuffer, bufferBytes, bufferOffsets);
         glm::vec3 v2 = getData<glm::vec3>(i2, mesh.mesh.positionsBuffer, bufferBytes, bufferOffsets);
@@ -213,6 +231,15 @@ __host__ __device__ float meshIntersectionTest(
             //glm::vec3 objspaceNormal = glm::normalize(glm::cross(v1 - v0, v2 - v1));
             if (glm::dot(ro - objspaceIntersection, objspaceNormal) < 0) { // if the point is on the other side of the triangle than the normal would suggest
                 objspaceNormal *= -1;
+            }
+
+            if (mesh.mesh.tangentsBuffer.buffer != -1) {
+                glm::vec4 t0 = getData<glm::vec4>(i0, mesh.mesh.tangentsBuffer, bufferBytes, bufferOffsets);
+                glm::vec4 t1 = getData<glm::vec4>(i1, mesh.mesh.tangentsBuffer, bufferBytes, bufferOffsets);
+                glm::vec4 t2 = getData<glm::vec4>(i2, mesh.mesh.tangentsBuffer, bufferBytes, bufferOffsets);
+
+                glm::vec4 objSpaceTangent = interpolateBarycentric(baryPosition, t0, t1, t2);
+                tangent = glm::vec4(glm::normalize(multiplyMV(mesh.invTranspose, glm::vec4(glm::vec3(objSpaceTangent), 0.f))), objSpaceTangent.w); // remove handedness for transform, readd for output
             }
 
             for (int j = 0; j < mesh.mesh.numTexCoords; j++) {

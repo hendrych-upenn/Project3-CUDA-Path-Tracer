@@ -68,8 +68,23 @@ bool geomFromPrimitive(Geom& geom, const tinygltf::Model& model, const tinygltf:
         return false;
     }
     tinygltf::Accessor indicesAccessor = model.accessors[primitive.indices];
-    cout << "Indices has component type number: " << indicesAccessor.componentType << "\n" << "Unsigned int: " << TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT << endl;
+    //cout << "Indices has component type number: " << indicesAccessor.componentType << "\n" << "Unsigned int: " << TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT << endl;
     geom.mesh.indicesBuffer = flatBufferViewFromAccessor(model, indicesAccessor);
+    geom.mesh.count = indicesAccessor.count;
+    switch (indicesAccessor.componentType) {
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+        geom.mesh.indicesType = U8;
+        break;
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+        geom.mesh.indicesType = U16;
+        break;
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+        geom.mesh.indicesType = U32;
+        break;
+    default:
+        cout << "Mesh INDICES accessor component type not unsigned byte, short, or int, skipping..." << endl;
+        return false;
+    }
 
     const auto& attributes = primitive.attributes;
 
@@ -110,9 +125,28 @@ bool geomFromPrimitive(Geom& geom, const tinygltf::Model& model, const tinygltf:
     }
     geom.mesh.normalsBuffer = flatBufferViewFromAccessor(model, normalAccessor);
 
+    auto tangentAttribute = attributes.find("TANGENT");
+    geom.mesh.tangentsBuffer.buffer = -1;
+    if (tangentAttribute != attributes.end()) {
+        int tangentAccessorIdx = (*tangentAttribute).second;
+        tinygltf::Accessor tangentAccessor = model.accessors[tangentAccessorIdx];
+        if (tangentAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT)
+        {
+            if (tangentAccessor.type = TINYGLTF_TYPE_VEC4) {
+                geom.mesh.tangentsBuffer = flatBufferViewFromAccessor(model, tangentAccessor);
+            }
+            else
+            {
+                cout << "Mesh TANGENT accessor type not vec4, skipping..." << endl;
+            }
+        }
+        else
+        {
+            cout << "Mesh TANGENT accessor component type not float, skipping..." << endl;
+        }
+    }
+
     geom.mesh.numTexCoords = 0;
-    //int i = 0;
-    //std::string texCoordStr =  + std::(i;
     for (int i = 0; attributes.find(std::string("TEXCOORD_") + std::to_string(i)) != attributes.end() && i < MAX_PATHTRACE_TEXTURES; i++) {
         int texcoordAccessorIdx = (*attributes.find(std::string("TEXCOORD_") + std::to_string(i))).second;
         tinygltf::Accessor texcoordAccessor = model.accessors[texcoordAccessorIdx];
@@ -199,6 +233,25 @@ void loadMaterials(std::vector<Material>& materials, const tinygltf::Model& mode
 
             const tinygltf::Sampler sampler = model.samplers[texture.sampler];
             auto& matSampler = mat.baseColorTexture.sampler;
+
+            matSampler.magFilter = sampler.magFilter;
+            matSampler.minFilter = sampler.minFilter;
+            matSampler.wrapS = sampler.wrapS;
+            matSampler.wrapT = sampler.wrapT;
+        }
+
+        if (material.normalTexture.index != -1) {
+            const auto& normalTexture = material.normalTexture;
+            mat.normalScale = normalTexture.scale;
+            mat.normalTexture.exists = true;
+            mat.normalTexture.texCoordsIdx = normalTexture.texCoord;
+
+            int textureIndex = normalTexture.index;
+            const tinygltf::Texture& texture = model.textures[textureIndex];
+            mat.normalTexture.imageBufferIdx = texture.source;
+
+            const tinygltf::Sampler sampler = model.samplers[texture.sampler];
+            auto& matSampler = mat.normalTexture.sampler;
 
             matSampler.magFilter = sampler.magFilter;
             matSampler.minFilter = sampler.minFilter;

@@ -1,0 +1,8 @@
+Model Information:
+* title:	Surveillance room
+* source:	https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304
+* author:	wa_rouk (https://sketchfab.com/wa_rouk)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

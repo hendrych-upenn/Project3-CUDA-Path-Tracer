@@ -217,6 +217,7 @@ __global__ void computeIntersections(
         float t = 0.0f;
         glm::vec3 intersect_point;
         glm::vec3 normal;
+        glm::vec4 tangent;
         glm::vec2 texCoords[MAX_PATHTRACE_TEXTURES];
 
         float t_min = FLT_MAX;
@@ -225,6 +226,7 @@ __global__ void computeIntersections(
 
         glm::vec3 tmp_intersect;
         glm::vec3 tmp_normal;
+        glm::vec4 tmp_tangent;
         glm::vec2 tmp_texCoords[MAX_PATHTRACE_TEXTURES];
 
         // naive parse through global geoms
@@ -243,8 +245,8 @@ __global__ void computeIntersections(
             }
             else if (geom.type == MESH)
             {
-                t = meshIntersectionTest(geom, pathSegment.ray, bufferBytes, bufferOffsets, tmp_intersect, tmp_normal 
-                    ,tmp_texCoords
+                t = meshIntersectionTest(geom, pathSegment.ray, bufferBytes, bufferOffsets, tmp_intersect, tmp_normal, 
+                    tmp_tangent, tmp_texCoords
                 );
             }
             // TODO: add more intersection tests here... triangle? metaball? CSG?
@@ -257,6 +259,7 @@ __global__ void computeIntersections(
                 hit_geom_index = i;
                 intersect_point = tmp_intersect;
                 normal = tmp_normal;
+                tangent = tmp_tangent;
 #pragma unroll
                 for (int j = 0; j < MAX_PATHTRACE_TEXTURES; j++) {
                     texCoords[j] = tmp_texCoords[j];
@@ -277,12 +280,35 @@ __global__ void computeIntersections(
             intersections[path_index].t = t_min;
             intersections[path_index].materialId = geoms[hit_geom_index].materialid;
             intersections[path_index].surfaceNormal = normal;
+            intersections[path_index].surfaceTangent = tangent;
 #pragma unroll
             for (int j = 0; j < MAX_PATHTRACE_TEXTURES; j++) {
                 getTexCoords(intersections[path_index], j) = texCoords[j];
             }
         }
     }
+}
+
+__host__ __device__ glm::vec4 indexIntoImage(
+    const uint8_t* imageBufferBytes,
+    const size_t* imageBufferOffsets,
+    const ImageData* imagesData,
+    int imageBufferIdx,
+    glm::vec2 texCoords
+) {
+    ImageData imageData = imagesData[imageBufferIdx];
+    // TODO: update for different sampling modes and wrapping
+    texCoords = glm::fract(texCoords);
+    int s = glm::floor(texCoords.s * imageData.width);
+    int t = glm::floor(texCoords.t * imageData.height);
+
+    size_t imageBufferOffset = imageBufferOffsets[imageBufferIdx];
+    imageBufferOffset += (s + ((size_t)t) * imageData.width) * ((((size_t)imageData.bitDepthPerChannel) * imageData.component) / 8);
+
+    const uint8_t* pixelData = imageBufferBytes + imageBufferOffset;
+
+    return glm::vec4(pixelData[0], pixelData[1], pixelData[2], pixelData[3]);
+
 }
 
 // LOOK: "fake" shader demonstrating what you might do with the info in
@@ -300,9 +326,9 @@ __global__ void shadeMaterial(
     int depth,
     const ShadeableIntersection* shadeableIntersections,
     PathSegment* pathSegments,
-    uint8_t* imageBufferBytes,
-    size_t* imageBufferOffsets,
-    ImageData* imagesData,
+    const uint8_t* imageBufferBytes,
+    const size_t* imageBufferOffsets,
+    const ImageData* imagesData,
     const Material* materials)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -320,24 +346,34 @@ __global__ void shadeMaterial(
 
             Material material = materials[intersection.materialId];
             glm::vec3 materialColor = material.color;
+            glm::vec3 normal = intersection.surfaceNormal;
 
             if (material.baseColorTexture.exists) {
                 auto& baseColorTexture = material.baseColorTexture;
                 glm::vec2 texCoords = getTexCoords(intersection, baseColorTexture.texCoordsIdx);
-                ImageData imageData = imagesData[baseColorTexture.imageBufferIdx];
-                // TODO: update for different sampling modes and wrapping
-                texCoords = glm::fract(texCoords);
-                int s = glm::floor(texCoords.s * imageData.width);
-                int t = glm::floor(texCoords.t * imageData.height);
 
-                size_t imageBufferOffset = imageBufferOffsets[baseColorTexture.imageBufferIdx];
-                imageBufferOffset += (s + ((size_t)t) * imageData.width) * ((((size_t)imageData.bitDepthPerChannel) * imageData.component) / 8);
-
-                uint8_t* pixelData = imageBufferBytes + imageBufferOffset;
-
-                glm::vec3 texColor = glm::vec3(pixelData[0], pixelData[1], pixelData[2]) / 255.0f;
+                glm::vec3 texColor = glm::vec3(indexIntoImage(imageBufferBytes, imageBufferOffsets, imagesData, baseColorTexture.imageBufferIdx, texCoords)) / 255.0f;
 
                 materialColor *= texColor;
+            }
+
+            if (material.normalTexture.exists) {
+                auto& normalTexture = material.normalTexture;
+                float scale = material.normalScale;
+
+                glm::vec2 texCoords = getTexCoords(intersection, normalTexture.imageBufferIdx);
+
+                glm::vec3 texColor = glm::vec3(indexIntoImage(imageBufferBytes, imageBufferOffsets, imagesData, normalTexture.imageBufferIdx, texCoords)) / 255.0f;
+
+                texColor = texColor * 2.0f - 1.0f; // map to [-1, 1]
+
+                glm::vec3 surfaceNormal = glm::normalize(intersection.surfaceNormal);
+                glm::vec3 surfaceTangent = glm::vec3(intersection.surfaceTangent);
+                surfaceTangent = glm::normalize(surfaceTangent - glm::dot(surfaceNormal, surfaceTangent) * surfaceNormal);
+                glm::vec3 surfaceBitangent = glm::normalize(glm::cross(surfaceNormal, surfaceTangent) * intersection.surfaceTangent.w);
+                //pathSegment.accumulatedColor = (surfaceBitangent + glm::vec3(1.0f)) / 2.0f;
+
+                normal = glm::normalize(texColor.x * scale * surfaceTangent + texColor.y * scale * surfaceBitangent + texColor.z * surfaceNormal);
             }
 
             pathSegment.color *= materialColor;
@@ -345,6 +381,8 @@ __global__ void shadeMaterial(
             // If the material indicates that the object was a light, "light" the ray
             pathSegment.accumulatedColor += pathSegment.color * material.emittance;
             //pathSegment.accumulatedColor = (intersection.surfaceNormal + glm::vec3(1.0f)) / 2.0f;
+            //pathSegment.accumulatedColor = (normal + glm::vec3(1.0f)) / 2.0f;
+            //pathSegment.accumulatedColor = (glm::vec3(intersection.surfaceTangent) + glm::vec3(1.0f)) / 2.0f;
             //pathSegment.accumulatedColor = glm::vec3(1.0);
             //pathSegment.accumulatedColor = pathSegment.color * (intersection.t / 1.0f);
             
@@ -362,7 +400,7 @@ __global__ void shadeMaterial(
                 //pathSegment.accumulatedColor += glm::vec3(0.0f, 1.0f, 0.0f);
                 //pathSegment.accumulatedColor += glm::vec3(1.0f);
             }
-            scatterRay(pathSegment, intersectionPoint, intersection.surfaceNormal, material, rng);
+            scatterRay(pathSegment, intersectionPoint, normal, material, rng);
             //pathSegment.accumulatedColor = (pathSegment.ray.direction + glm::vec3(1.0f))/2.0f; //  pathSegment.color *
             pathSegment.remainingBounces -= 1;
             //float lightTerm = glm::dot(intersection.surfaceNormal, glm::vec3(0.0f, 1.0f, 0.0f));

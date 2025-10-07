@@ -18,6 +18,12 @@ enum GeomType
     MESH,
 };
 
+enum IndicesType {
+    U8,
+    U16,
+    U32,
+};
+
 struct Ray
 {
     glm::vec3 origin;
@@ -50,9 +56,12 @@ struct Geom
         int mode;
         glm::vec3 position_min;
         glm::vec3 position_max;
+        size_t count;
+        IndicesType indicesType;
         FlatBufferView indicesBuffer;
         FlatBufferView positionsBuffer;
         FlatBufferView normalsBuffer;
+        FlatBufferView tangentsBuffer;
         FlatBufferView textureCoordsBuffers[MAX_PATHTRACE_TEXTURES];
         int numTexCoords = 0;
     } mesh;
@@ -83,6 +92,8 @@ struct Material
     float indexOfRefraction;
     glm::vec3 emittance;
     TextureImageInfo baseColorTexture;
+    TextureImageInfo normalTexture;
+    float normalScale;
 };
 
 
@@ -126,6 +137,7 @@ struct ShadeableIntersection
   int materialId;
   float t;
   glm::vec3 surfaceNormal;
+  glm::vec4 surfaceTangent;
   glm::vec2 texCoords0;
   glm::vec2 texCoords1;
   glm::vec2 texCoords2;
