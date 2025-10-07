@@ -6,8 +6,8 @@ CUDA Path Tracer
 ![](img/fluxs.png)
 ![](img/knife_normal.png)
 ![](img/knife_procedural_normal.png)
+![](img/knife_procedural_color.png)
 ![](img/surveillance_partial.png)
-![](img/surveillance_color.png)
 
 * Oliver Hendrych
   * [LinkedIn](https://www.linkedin.com/in/oliver-hendrych/)
